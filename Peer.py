@@ -50,33 +50,34 @@ class Peer(IServer, IClient):
         self.__listenerUDPSocket.bind(('0.0.0.0', self.port))
         print('Listening for messages at {}'.format(self.__listenerUDPSocket.getsockname()))
 
-        try:
-            # Start receiving messages
-            while True:
-                data, address = self.__listenerUDPSocket.recvfrom(BUFFERSIZE)
-                text = data.decode('ascii')
-                print('The client at {} says: {}'.format(address, text))
-                try:
-                    message = json.loads(text)
+        # Start receiving messages
+        while True:
+            data, address = self.__listenerUDPSocket.recvfrom(BUFFERSIZE)
+            text = data.decode('ascii')
+            print('The client at {} says: {}'.format(address, text))
+            try:
+                message = json.loads(text)
 
-                    action = message["action"]
-                    fromPeer = message["fromPeer"]
-                    fromPeer.update({"address": address[0]})
-                    if action == "join":
-                        self.onJoin(fromPeer)
-                    elif action == "leave":
-                        self.onLeave(fromPeer)
-                except Exception as error:
-                    print(str(error))
-        except OSError as exception:
-            print(str(exception))
+                action = message["action"]
+                fromPeer = message["fromPeer"]
+                fromPeer.update({"address": address[0]})
+                if action == "join":
+                    self.onJoin(fromPeer)
+                elif action == "leave":
+                    self.onLeave(fromPeer)
+            except Exception as error:
+                print(str(error))
 
     def onJoin(self, peer):
         self.__MDNSCache.update({peer["name"]: peer["address"]})
         print(self.__MDNSCache)
 
     def onLeave(self, peer):
-        self.__MDNSCache.pop(peer["name"])
+        try:
+            self.__MDNSCache.pop(peer["name"])
+        except KeyError as exception:
+            # Keyerror when not found. Does not matter
+            pass
         print(self.__MDNSCache)
 
     # Client methods
