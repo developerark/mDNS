@@ -1,7 +1,7 @@
 from IServer import IServer
-from IPeer import IPeer
+from IClient import IClient
 
-class Node(IServer, IPeer):
+class Peer(IServer, IClient):
     def __init__(self, name, port=8080):
         '''
         Creates a P2P Node
@@ -29,5 +29,25 @@ class Node(IServer, IPeer):
     def port(self, value):
         self.__port = value
 
+    # Client methods
+    def join(self):
+        '''
+        Once instanciated, this method is called which will broadcast to the
+        network that it has joined the network
+        '''
+        pass
+
+    def leave(self):
+        pass
+
+    # Server methods
+    def onJoin(self):
+        pass
+
+    def onLeave(self):
+        pass
+
+
 if __name__ == "__main__":
-    node = Node("Aswin's iPhone")
+    peer = Peer("Aswin's iPhone")
+    peer.join()

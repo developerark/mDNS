@@ -1,12 +1,17 @@
-class IServer:
-    def onJoin():
+import abc
+
+class IServer(abc.ABC):
+
+    @abc.abstractmethod
+    def onJoin(self):
         '''
         When server receives a join broadcast from a peer
         '''
-        raise NotImplementedError("Subclass needs to implement onJoin()")
+        pass
 
-    def onLeave():
+    @abc.abstractmethod
+    def onLeave(self):
         '''
         When server receives a leave broadcast from a peer
         '''
-        raise NotImplementedError("Subclass needs to implement onLeave()")
+        pass
