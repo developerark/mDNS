@@ -65,7 +65,6 @@ class Peer(IServer, IClient):
                     self.onJoin(fromPeer)
                 elif action == "leave":
                     self.onLeave(fromPeer)
-                    return
             except Exception as error:
                 print(str(error))
 
