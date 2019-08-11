@@ -3,6 +3,7 @@ from IClient import IClient
 import socket
 from threading import Thread
 import json
+import argparse
 
 BUFFERSIZE = 65535
 
@@ -108,7 +109,11 @@ class Peer(IServer, IClient):
 
 
 if __name__ == "__main__":
-    peer = Peer("Aswin's iPhone")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("deviceName", type=str, help="A unique name for the device")
+    args = parser.parse_args()
+
+    peer = Peer(args.deviceName)
     peer.join()
     import time
     time.sleep(10)
