@@ -1,9 +1,12 @@
 from IServer import IServer
 from IClient import IClient
 import socket
-from threading import Thread
+from threading import Thread, Lock
 import json
 import argparse
+import time
+import signal
+import sys
 
 BUFFERSIZE = 65535
 
@@ -43,13 +46,13 @@ class Peer(IServer, IClient):
     # Server methods
     def __startListening(self):
         # Setup socket and bind
-        UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        UDPSocket.bind(('0.0.0.0', self.port))
-        print('Listening for messages at {}'.format(UDPSocket.getsockname()))
+        self.__listnerUDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.__listnerUDPSocket.bind(('0.0.0.0', self.port))
+        print('Listening for messages at {}'.format(self.__listnerUDPSocket.getsockname()))
 
         # Start receiving messages
         while True:
-            data, address = UDPSocket.recvfrom(BUFFERSIZE)
+            data, address = self.__listnerUDPSocket.recvfrom(BUFFERSIZE)
             text = data.decode('ascii')
             print('The client at {} says: {}'.format(address, text))
             try:
@@ -62,7 +65,7 @@ class Peer(IServer, IClient):
                     self.onJoin(fromPeer)
                 elif action == "leave":
                     self.onLeave(fromPeer)
-
+                    return
             except Exception as error:
                 print(str(error))
 
@@ -84,6 +87,10 @@ class Peer(IServer, IClient):
         self.__listenerThread = Thread(target=self.__startListening, daemon=False)
         self.__listenerThread.start()
 
+        # Give the listener some time to load
+        time.sleep(3)
+
+        # Broadcast that you are joining the network
         UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         UDPSocket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         text = json.dumps({
@@ -94,7 +101,7 @@ class Peer(IServer, IClient):
         })
         UDPSocket.sendto(text.encode('ascii'), ('<broadcast>', self.__port))
 
-        #self.__listenerThread.join()
+        self.__listenerThread.join()
 
     def leave(self):
         UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -107,14 +114,20 @@ class Peer(IServer, IClient):
         })
         UDPSocket.sendto(text.encode('ascii'), ('<broadcast>', self.__port))
 
+        # Give the listeners some time to remove yourself
+        time.sleep(3)
+
+        self.__listnerUDPSocket.close()
 
 if __name__ == "__main__":
+    # Argument Parser setup
     parser = argparse.ArgumentParser()
     parser.add_argument("deviceName", type=str, help="A unique name for the device")
     args = parser.parse_args()
 
-    peer = Peer(args.deviceName)
-    peer.join()
-    import time
-    time.sleep(10)
-    peer.leave()
+    try:
+        # Instantiate a Node
+        peer = Peer(args.deviceName)
+        peer.join()
+    except KeyboardInterrupt as error:
+        peer.leave()
