@@ -68,9 +68,8 @@ class Peer(IServer, IClient):
                         self.onLeave(fromPeer)
                 except Exception as error:
                     print(str(error))
-        except Exception as error:
-            # Wake up from recv blocking call
-            pass
+        except OSError as exception:
+            print(str(exception))
 
     def onJoin(self, peer):
         self.__MDNSCache.update({peer["name"]: peer["address"]})
@@ -133,4 +132,5 @@ if __name__ == "__main__":
         peer = Peer(args.deviceName)
         peer.join()
     except KeyboardInterrupt as error:
+        print("Leaving...")
         peer.leave()
