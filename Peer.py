@@ -46,27 +46,31 @@ class Peer(IServer, IClient):
     # Server methods
     def __startListening(self):
         # Setup socket and bind
-        self.__listnerUDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.__listnerUDPSocket.bind(('0.0.0.0', self.port))
-        print('Listening for messages at {}'.format(self.__listnerUDPSocket.getsockname()))
+        self.__listenerUDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.__listenerUDPSocket.bind(('0.0.0.0', self.port))
+        print('Listening for messages at {}'.format(self.__listenerUDPSocket.getsockname()))
 
-        # Start receiving messages
-        while True:
-            data, address = self.__listnerUDPSocket.recvfrom(BUFFERSIZE)
-            text = data.decode('ascii')
-            print('The client at {} says: {}'.format(address, text))
-            try:
-                message = json.loads(text)
+        try:
+            # Start receiving messages
+            while True:
+                data, address = self.__listenerUDPSocket.recvfrom(BUFFERSIZE)
+                text = data.decode('ascii')
+                print('The client at {} says: {}'.format(address, text))
+                try:
+                    message = json.loads(text)
 
-                action = message["action"]
-                fromPeer = message["fromPeer"]
-                fromPeer.update({"address": address[0]})
-                if action == "join":
-                    self.onJoin(fromPeer)
-                elif action == "leave":
-                    self.onLeave(fromPeer)
-            except Exception as error:
-                print(str(error))
+                    action = message["action"]
+                    fromPeer = message["fromPeer"]
+                    fromPeer.update({"address": address[0]})
+                    if action == "join":
+                        self.onJoin(fromPeer)
+                    elif action == "leave":
+                        self.onLeave(fromPeer)
+                except Exception as error:
+                    print(str(error))
+        except Exception as error:
+            # Wake up from recv blocking call
+            pass
 
     def onJoin(self, peer):
         self.__MDNSCache.update({peer["name"]: peer["address"]})
@@ -116,7 +120,7 @@ class Peer(IServer, IClient):
         # Give the listeners some time to remove yourself
         time.sleep(3)
 
-        self.__listnerUDPSocket.close()
+        self.__listenerUDPSocket.close()
 
 if __name__ == "__main__":
     # Argument Parser setup
