@@ -23,6 +23,23 @@ class Peer(IServer, IClient):
         # name -> IP on the network
         self.__MDNSCache = {}
 
+        # Thread kill
+        self.__isRunning = True
+        self.__isRunningLock = Lock()
+
+    @property
+    def isRunning(self):
+        self.__isRunningLock.acquire()
+        temp = self.__isRunning
+        self.__isRunningLock.release()
+        return temp
+
+    @isRunning.setter
+    def isRunning(self, value):
+        self.__isRunningLock.acquire()
+        self.__isRunning = value
+        self.__isRunningLock.release()
+
     def __iter__(self):
         yield "name", self.name
 
@@ -47,13 +64,18 @@ class Peer(IServer, IClient):
         # Setup socket and bind
         self.__listenerUDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.__listenerUDPSocket.bind(('0.0.0.0', self.port))
+        self.__listenerUDPSocket.settimeout(3)
         print('Listening for messages at {}'.format(self.__listenerUDPSocket.getsockname()))
 
         # Start receiving messages
-        while True:
-            data, address = self.__listenerUDPSocket.recvfrom(BUFFERSIZE)
-            if address == None:
-                return
+        while self.isRunning:
+
+            try:
+                data, address = self.__listenerUDPSocket.recvfrom(BUFFERSIZE)
+            except socket.timeout:
+                continue
+            except Exception as exception:
+                print(str(exception))
 
             text = data.decode('ascii')
             #print('The client at {} says: {}'.format(address, text))
@@ -72,6 +94,7 @@ class Peer(IServer, IClient):
             except Exception as error:
                 print(str(error))
 
+        self.__listenerUDPSocket.close()
 
     def onJoin(self, peer):
         self.__MDNSCache.update({peer["name"]: peer["address"]})
@@ -100,7 +123,7 @@ class Peer(IServer, IClient):
         network that it has joined the network
         '''
         # Start the listener thread before broadcast
-        self.__listenerThread = Thread(target=self.__startListening, daemon=True)
+        self.__listenerThread = Thread(target=self.__startListening, daemon=False)
         self.__listenerThread.start()
 
         # Give the listener some time to load
@@ -117,6 +140,8 @@ class Peer(IServer, IClient):
         })
         UDPSocket.sendto(text.encode('ascii'), ('<broadcast>', self.__port))
 
+        #self.__listenerThread.join()
+
     def leave(self):
         UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         UDPSocket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -131,11 +156,7 @@ class Peer(IServer, IClient):
         # Give the listeners some time to remove yourself
         time.sleep(3)
 
-        try:
-            self.__listenerUDPSocket.shutdown(socket.SHUT_RDWR)
-            self.__listenerUDPSocket.close()
-        except Exception as exception:
-            pass
+        self.isRunning = False
 
     def ping(self, peer):
         UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
