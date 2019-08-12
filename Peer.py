@@ -140,7 +140,7 @@ class Peer(IServer, IClient):
         })
         UDPSocket.sendto(text.encode('ascii'), ('<broadcast>', self.__port))
 
-        #self.__listenerThread.join()
+        self.__listenerThread.join()
 
     def leave(self):
         UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -182,9 +182,9 @@ if __name__ == "__main__":
     parser.add_argument("deviceName", type=str, help="A unique name for the device")
     args = parser.parse_args()
 
-    peer = Peer(args.deviceName)
-    peer.join()
-
-    input("")
-
-    peer.leave()
+    try:
+        peer = Peer(args.deviceName)
+        print("Press Ctrl-c to exit at anytime...")
+        peer.join()
+    except (KeyboardInterrupt, SystemExit) as exception:
+        peer.leave()
