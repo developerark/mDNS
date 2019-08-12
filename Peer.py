@@ -5,6 +5,7 @@ from threading import Thread, Lock
 import json
 import argparse
 import time
+import sys
 
 BUFFERSIZE = 65535
 
@@ -55,7 +56,7 @@ class Peer(IServer, IClient):
                 return
 
             text = data.decode('ascii')
-            print('The client at {} says: {}'.format(address, text))
+            #print('The client at {} says: {}'.format(address, text))
             try:
                 message = json.loads(text)
 
@@ -75,7 +76,8 @@ class Peer(IServer, IClient):
     def onJoin(self, peer):
         self.__MDNSCache.update({peer["name"]: peer["address"]})
         self.ping(peer)
-        print(self.__MDNSCache)
+        print("{} joined the network from IP {}\n{}".format(peer["name"], peer["address"], self.__MDNSCache))
+        #self.refresh("{} joined the network from IP {}\n{}".format(peer["name"], peer["address"], self.__MDNSCache))
 
     def onLeave(self, peer):
         try:
@@ -83,11 +85,13 @@ class Peer(IServer, IClient):
         except KeyError as exception:
             # Keyerror when not found. Does not matter
             pass
-        print(self.__MDNSCache)
+        print("{} left the network from {}\n{}".format(peer["name"], peer["address"], self.__MDNSCache))
+        #self.refresh("{} left the network\n{}".format(peer["name"], peer["address"], self.__MDNSCache))
 
     def onPing(self, peer):
         self.__MDNSCache.update({peer["name"]: peer["address"]})
-        print(self.__MDNSCache)
+        print("{} pinged me saying it is alive at {}\n{}".format(peer["name"], peer["address"], self.__MDNSCache))
+        #self.refresh("{} pinged me saying it is alive at {}\n{}".format(peer["name"], peer["address"], self.__MDNSCache))
 
     # Client methods
     def join(self):
@@ -142,6 +146,14 @@ class Peer(IServer, IClient):
             }
         })
         UDPSocket.sendto(text.encode('ascii'), (peer["address"], self.port))
+
+    def refresh(self, activity):
+        '''
+        Update window with the current activity and __MDNSCache
+        '''
+        sys.stdout.write("\r{}".format(activity))
+        sys.stdout.flush()
+
 
 if __name__ == "__main__":
     # Argument Parser setup
