@@ -15,3 +15,9 @@ class IServer(abc.ABC):
         When server receives a leave broadcast from a peer
         '''
         pass
+
+    @abc.abstractmethod
+    def onPing(self, peer):
+        '''
+        When peer pings saying they are alive
+        '''

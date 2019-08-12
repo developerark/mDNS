@@ -5,8 +5,6 @@ from threading import Thread, Lock
 import json
 import argparse
 import time
-import signal
-import sys
 
 BUFFERSIZE = 65535
 
@@ -50,31 +48,33 @@ class Peer(IServer, IClient):
         self.__listenerUDPSocket.bind(('0.0.0.0', self.port))
         print('Listening for messages at {}'.format(self.__listenerUDPSocket.getsockname()))
 
-        try:
-            # Start receiving messages
-            while True:
-                data, address = self.__listenerUDPSocket.recvfrom(BUFFERSIZE)
-                text = data.decode('ascii')
-                print('The client at {} says: {}'.format(address, text))
-                try:
-                    message = json.loads(text)
+        # Start receiving messages
+        while True:
+            data, address = self.__listenerUDPSocket.recvfrom(BUFFERSIZE)
+            if address == None:
+                return
 
-                    action = message["action"]
-                    fromPeer = message["fromPeer"]
-                    fromPeer.update({"address": address[0]})
-                    if action == "join":
-                        self.onJoin(fromPeer)
-                    elif action == "leave":
-                        self.onLeave(fromPeer)
-                except Exception as error:
-                    print(str(error))
-        except OSError as exception:
-            pass
-        except Exception as exception:
-            print(str(exception))
+            text = data.decode('ascii')
+            print('The client at {} says: {}'.format(address, text))
+            try:
+                message = json.loads(text)
+
+                action = message["action"]
+                fromPeer = message["fromPeer"]
+                fromPeer.update({"address": address[0]})
+                if action == "join":
+                    self.onJoin(fromPeer)
+                elif action == "leave":
+                    self.onLeave(fromPeer)
+                elif action == "ping":
+                    self.onPing(fromPeer)
+            except Exception as error:
+                print(str(error))
+
 
     def onJoin(self, peer):
         self.__MDNSCache.update({peer["name"]: peer["address"]})
+        self.ping(peer)
         print(self.__MDNSCache)
 
     def onLeave(self, peer):
@@ -85,6 +85,10 @@ class Peer(IServer, IClient):
             pass
         print(self.__MDNSCache)
 
+    def onPing(self, peer):
+        self.__MDNSCache.update({peer["name"]: peer["address"]})
+        print(self.__MDNSCache)
+
     # Client methods
     def join(self):
         '''
@@ -92,7 +96,7 @@ class Peer(IServer, IClient):
         network that it has joined the network
         '''
         # Start the listener thread before broadcast
-        self.__listenerThread = Thread(target=self.__startListening, daemon=False)
+        self.__listenerThread = Thread(target=self.__startListening, daemon=True)
         self.__listenerThread.start()
 
         # Give the listener some time to load
@@ -109,8 +113,6 @@ class Peer(IServer, IClient):
         })
         UDPSocket.sendto(text.encode('ascii'), ('<broadcast>', self.__port))
 
-        self.__listenerThread.join()
-
     def leave(self):
         UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         UDPSocket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -118,14 +120,28 @@ class Peer(IServer, IClient):
             "action": "leave",
             "fromPeer": {
                 "name": self.name,
-            }
+                }
         })
         UDPSocket.sendto(text.encode('ascii'), ('<broadcast>', self.__port))
 
         # Give the listeners some time to remove yourself
         time.sleep(3)
 
-        self.__listenerUDPSocket.close()
+        try:
+            self.__listenerUDPSocket.shutdown(socket.SHUT_RDWR)
+            self.__listenerUDPSocket.close()
+        except Exception as exception:
+            pass
+
+    def ping(self, peer):
+        UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        text = json.dumps({
+            "action": "ping",
+            "fromPeer": {
+                "name": self.name
+            }
+        })
+        UDPSocket.sendto(text.encode('ascii'), (peer["address"], self.port))
 
 if __name__ == "__main__":
     # Argument Parser setup
@@ -133,10 +149,9 @@ if __name__ == "__main__":
     parser.add_argument("deviceName", type=str, help="A unique name for the device")
     args = parser.parse_args()
 
-    try:
-        # Instantiate a Node
-        peer = Peer(args.deviceName)
-        peer.join()
-    except KeyboardInterrupt as error:
-        print("Leaving...")
-        peer.leave()
+    peer = Peer(args.deviceName)
+    peer.join()
+
+    input("")
+
+    peer.leave()
